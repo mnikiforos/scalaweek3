@@ -8,7 +8,7 @@ import TweetReader._
 class Tweet(val user: String, val text: String, val retweets: Int) {
   override def toString: String =
     "User: " + user + "\n" +
-    "Text: " + text + " [" + retweets + "]"
+      "Text: " + text + " [" + retweets + "]"
 }
 
 /**
@@ -34,6 +34,8 @@ class Tweet(val user: String, val text: String, val retweets: Int) {
  */
 abstract class TweetSet {
 
+  def isEmpty: Boolean
+
   /**
    * This method takes a predicate and returns a subset of all the elements
    * in the original set for which the predicate is true.
@@ -41,8 +43,8 @@ abstract class TweetSet {
    * Question: Can we implment this method here, or should it remain abstract
    * and be implemented in the subclasses?
    */
-    def filter(p: Tweet => Boolean): TweetSet = ???
-  
+  def filter(p: Tweet => Boolean): TweetSet = this.filterAcc(p, new Empty())
+
   /**
    * This is a helper method for `filter` that propagetes the accumulated tweets.
    */
@@ -54,8 +56,8 @@ abstract class TweetSet {
    * Question: Should we implment this method here, or should it remain abstract
    * and be implemented in the subclasses?
    */
-    def union(that: TweetSet): TweetSet = ???
-  
+  def union(that: TweetSet): TweetSet
+
   /**
    * Returns the tweet from this set which has the greatest retweet count.
    *
@@ -65,8 +67,13 @@ abstract class TweetSet {
    * Question: Should we implment this method here, or should it remain abstract
    * and be implemented in the subclasses?
    */
-    def mostRetweeted: Tweet = ???
-  
+  def compareAgainst(p: (Tweet, Tweet) => Tweet): Tweet =
+    if (isEmpty) throw new java.util.NoSuchElementException() else compareAgainstAcc(p, null)
+
+  def compareAgainstAcc(p: (Tweet, Tweet) => Tweet, compareTo: Tweet): Tweet
+
+  def mostRetweeted: Tweet = compareAgainst((a: Tweet, b: Tweet) => if (a.retweets > b.retweets) a else b)
+
   /**
    * Returns a list containing all tweets of this set, sorted by retweet count
    * in descending order. In other words, the head of the resulting list should
@@ -76,8 +83,18 @@ abstract class TweetSet {
    * Question: Should we implment this method here, or should it remain abstract
    * and be implemented in the subclasses?
    */
-    def descendingByRetweet: TweetList = ???
-  
+  def descendingByRetweet: TweetList = {
+    def loop(tweetSet: TweetSet, acc: TweetList): TweetList = {
+      if (tweetSet.isEmpty) acc
+      else {
+        val min = tweetSet.compareAgainst((a: Tweet, b: Tweet) => if (a.retweets > b.retweets) b else a)
+        loop(tweetSet.remove(min), new Cons(min, acc))
+      }
+    }
+    loop(this, Nil)
+  }
+
+
   /**
    * The following methods are already implemented
    */
@@ -107,8 +124,15 @@ abstract class TweetSet {
 }
 
 class Empty extends TweetSet {
-    def filterAcc(p: Tweet => Boolean, acc: TweetSet): TweetSet = ???
-  
+  override def isEmpty: Boolean = true
+
+  override def filterAcc(p: Tweet => Boolean, acc: TweetSet): TweetSet = acc
+
+  override def union(that: TweetSet): TweetSet = that
+
+  override def compareAgainstAcc(p: (Tweet, Tweet) => Tweet, compareTo: Tweet): Tweet = compareTo
+
+
   /**
    * The following methods are already implemented
    */
@@ -120,13 +144,37 @@ class Empty extends TweetSet {
   def remove(tweet: Tweet): TweetSet = this
 
   def foreach(f: Tweet => Unit): Unit = ()
+
+  /**
+   * Returns the tweet from this set which has the greatest retweet count.
+   *
+   * Calling `mostRetweeted` on an empty set should throw an exception of
+   * type `java.util.NoSuchElementException`.
+   *
+   * Question: Should we implment this method here, or should it remain abstract
+   * and be implemented in the subclasses?
+   */
+
 }
 
 class NonEmpty(elem: Tweet, left: TweetSet, right: TweetSet) extends TweetSet {
+  override def isEmpty: Boolean = false
 
-    def filterAcc(p: Tweet => Boolean, acc: TweetSet): TweetSet = ???
-  
-    
+  override def filterAcc(p: Tweet => Boolean, acc: TweetSet): TweetSet =
+    if (left.isEmpty && right.isEmpty)
+      if (p(elem)) this else new Empty()
+    else
+      (left.filterAcc(p, acc)
+        .union(right.filterAcc(p, acc)))
+        .union(if (p(elem)) new NonEmpty(elem, new Empty(), new Empty()) else new Empty())
+
+  override def union(that: TweetSet): TweetSet = left.union(right).union(that).incl(elem)
+
+  override def compareAgainstAcc(p: (Tweet, Tweet) => Tweet, compareTo: Tweet): Tweet = {
+    val compareToMod = if (compareTo == null) elem else compareTo
+    p(elem, p(left.compareAgainstAcc(p, compareToMod), right.compareAgainstAcc(p, compareToMod)))
+  }
+
   /**
    * The following methods are already implemented
    */
@@ -152,12 +200,26 @@ class NonEmpty(elem: Tweet, left: TweetSet, right: TweetSet) extends TweetSet {
     left.foreach(f)
     right.foreach(f)
   }
+
+  /**
+   * Returns the tweet from this set which has the greatest retweet count.
+   *
+   * Calling `mostRetweeted` on an empty set should throw an exception of
+   * type `java.util.NoSuchElementException`.
+   *
+   * Question: Should we implment this method here, or should it remain abstract
+   * and be implemented in the subclasses?
+   */
+
 }
 
 trait TweetList {
   def head: Tweet
+
   def tail: TweetList
+
   def isEmpty: Boolean
+
   def foreach(f: Tweet => Unit): Unit =
     if (!isEmpty) {
       f(head)
@@ -167,7 +229,9 @@ trait TweetList {
 
 object Nil extends TweetList {
   def head = throw new java.util.NoSuchElementException("head of EmptyList")
+
   def tail = throw new java.util.NoSuchElementException("tail of EmptyList")
+
   def isEmpty = true
 }
 
@@ -180,15 +244,15 @@ object GoogleVsApple {
   val google = List("android", "Android", "galaxy", "Galaxy", "nexus", "Nexus")
   val apple = List("ios", "iOS", "iphone", "iPhone", "ipad", "iPad")
 
-    lazy val googleTweets: TweetSet = ???
+  lazy val googleTweets: TweetSet = ???
   lazy val appleTweets: TweetSet = ???
-  
+
   /**
    * A list of all tweets mentioning a keyword from either apple or google,
    * sorted by the number of retweets.
    */
-     lazy val trending: TweetList = ???
-  }
+  lazy val trending: TweetList = ???
+}
 
 object Main extends App {
   // Print the trending tweets
