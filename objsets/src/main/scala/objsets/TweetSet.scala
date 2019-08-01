@@ -162,7 +162,7 @@ class NonEmpty(elem: Tweet, left: TweetSet, right: TweetSet) extends TweetSet {
 
   override def filterAcc(p: Tweet => Boolean, acc: TweetSet): TweetSet =
     if (left.isEmpty && right.isEmpty)
-      if (p(elem)) this else new Empty()
+      if (p(elem)) new NonEmpty(elem, new Empty(), new Empty()) else new Empty()
     else
       (left.filterAcc(p, acc)
         .union(right.filterAcc(p, acc)))
@@ -244,7 +244,7 @@ object GoogleVsApple {
   val google = List("android", "Android", "galaxy", "Galaxy", "nexus", "Nexus")
   val apple = List("ios", "iOS", "iphone", "iPhone", "ipad", "iPad")
 
-  lazy val googleTweets: TweetSet = ???
+  lazy val googleTweets: TweetSet = TweetReader.allTweets.filter(x => google.contains(x.text))
   lazy val appleTweets: TweetSet = ???
 
   /**
