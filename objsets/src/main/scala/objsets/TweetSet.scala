@@ -244,7 +244,7 @@ object GoogleVsApple {
   val google = List("android", "Android", "galaxy", "Galaxy", "nexus", "Nexus")
   val apple = List("ios", "iOS", "iphone", "iPhone", "ipad", "iPad")
 
-  lazy val googleTweets: TweetSet = TweetReader.allTweets.filter(x => google.contains(x.text))
+  lazy val googleTweets: TweetSet = TweetReader.allTweets.filter(x => google.exists(y => x.text.contains(y)))
   lazy val appleTweets: TweetSet = ???
 
   /**
